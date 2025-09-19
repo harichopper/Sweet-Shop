@@ -1,26 +1,33 @@
 # Dependencies
 node_modules/
-package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Production builds
+/backend/dist
+/frontend/dist
+/frontend/build
 
 # Environment files
 .env
 .env.local
-.env.test
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Build outputs
-dist/
-build/
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Coverage
-coverage/
-
-# Logs
-*.log
-
-# Database
-*.db
-*.sqlite
-
-# OS generated files
+# OS files
 .DS_Store
 Thumbs.db
+
+# Test coverage
+coverage/
+
+# Screenshots are tracked (comment out the line below if you don't want to track them)
+# screenshots/

@@ -1,4 +1,4 @@
-require('dotenv').config(); // Load environment variables at the top
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
@@ -9,23 +9,30 @@ const User = require('./models/user');
 const Sweet = require('./models/sweet');
 
 const app = express();
-app.use(cors());
+
+// ----------------- Middleware -----------------
 app.use(express.json());
 
-// MongoDB connection
+const allowedOrigins = [process.env.FRONTEND_URL || 'http://localhost:3000'];
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
+
+// ----------------- MongoDB -----------------
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-  .then(() => console.log('Connected to MongoDB'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+  .then(() => console.log('✅ Connected to MongoDB'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
 
-// JWT setup
 const SECRET_KEY = process.env.SECRET_KEY;
 
+// ----------------- Auth Middleware -----------------
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = authHeader?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Access token required' });
 
   try {
@@ -39,8 +46,7 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-// ---------------------- Auth Routes ----------------------
-// Register
+// ----------------- Auth Routes -----------------
 app.post('/api/auth/register', async (req, res) => {
   const { username, password, isAdmin } = req.body;
   try {
@@ -57,11 +63,11 @@ app.post('/api/auth/register', async (req, res) => {
     await user.save();
     res.status(201).json({ id: user.id, username: user.username, isAdmin: user.isAdmin });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Login
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -70,43 +76,41 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Incorrect username or password' });
     }
     const token = jwt.sign({ username: user.username }, SECRET_KEY, { expiresIn: '30m' });
-    res.json({ access_token: token, token_type: 'bearer' });
+    res.json({ access_token: token });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Get current user
 app.get('/api/auth/me', authenticateToken, (req, res) => {
   res.json({ id: req.user.id, username: req.user.username, isAdmin: req.user.isAdmin });
 });
 
-// ---------------------- Sweet Routes ----------------------
-// Create Sweet (Admin only)
+// ----------------- Sweet Routes -----------------
 app.post('/api/sweets', authenticateToken, async (req, res) => {
   if (!req.user.isAdmin) return res.status(403).json({ error: 'Admin access required' });
-
   const { name, category, price, quantity } = req.body;
   try {
     const sweet = new Sweet({ id: uuidv4(), name, category, price, quantity });
     await sweet.save();
     res.status(201).json(sweet);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Get all sweets
 app.get('/api/sweets', async (req, res) => {
   try {
     const sweets = await Sweet.find();
     res.json(sweets);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Search sweets
 app.get('/api/sweets/search', async (req, res) => {
   const { name, category, minPrice, maxPrice } = req.query;
   const query = {};
@@ -119,14 +123,13 @@ app.get('/api/sweets/search', async (req, res) => {
     const sweets = await Sweet.find(query);
     res.json(sweets);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Update sweet (Admin only)
 app.put('/api/sweets/:id', authenticateToken, async (req, res) => {
   if (!req.user.isAdmin) return res.status(403).json({ error: 'Admin access required' });
-
   const { name, category, price, quantity } = req.body;
   try {
     const sweet = await Sweet.findOneAndUpdate(
@@ -137,24 +140,23 @@ app.put('/api/sweets/:id', authenticateToken, async (req, res) => {
     if (!sweet) return res.status(404).json({ error: 'Sweet not found' });
     res.json(sweet);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Delete sweet (Admin only)
 app.delete('/api/sweets/:id', authenticateToken, async (req, res) => {
   if (!req.user.isAdmin) return res.status(403).json({ error: 'Admin access required' });
-
   try {
     const sweet = await Sweet.findOneAndDelete({ id: req.params.id });
     if (!sweet) return res.status(404).json({ error: 'Sweet not found' });
     res.json({ message: 'Sweet deleted' });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Purchase sweet
 app.post('/api/sweets/:id/purchase', authenticateToken, async (req, res) => {
   try {
     const sweet = await Sweet.findOne({ id: req.params.id });
@@ -164,17 +166,15 @@ app.post('/api/sweets/:id/purchase', authenticateToken, async (req, res) => {
     await sweet.save();
     res.json({ message: 'Purchase successful', quantity: sweet.quantity });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Restock sweet (Admin only)
 app.post('/api/sweets/:id/restock', authenticateToken, async (req, res) => {
   if (!req.user.isAdmin) return res.status(403).json({ error: 'Admin access required' });
-
   const { quantity } = req.body;
   if (!quantity || quantity <= 0) return res.status(400).json({ error: 'Quantity must be positive' });
-
   try {
     const sweet = await Sweet.findOne({ id: req.params.id });
     if (!sweet) return res.status(404).json({ error: 'Sweet not found' });
@@ -182,14 +182,15 @@ app.post('/api/sweets/:id/restock', authenticateToken, async (req, res) => {
     await sweet.save();
     res.json({ message: 'Restock successful', quantity: sweet.quantity });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// ---------------------- Start Server ----------------------
-// src/index.js
-const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// ----------------- Start Server -----------------
+app.get('/', (req, res) => {
+  res.send('Sweet Shop Backend is running! Use /api/... for API endpoints.');
 });
 
+const PORT = process.env.PORT || 8000;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

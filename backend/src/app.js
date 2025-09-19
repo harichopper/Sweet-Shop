@@ -7,29 +7,32 @@ const sweetRoutes = require('./routes/sweetRoutes');
 
 const app = express();
 
-// CORS configuration
+// ----------------- CORS -----------------
+const allowedOrigins = [process.env.FRONTEND_URL || 'http://localhost:3000'];
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173'],
-  credentials: true
+  origin: allowedOrigins,
+  credentials: true,
 }));
 
+// ----------------- Middleware -----------------
 app.use(express.json());
 
-// MongoDB connection
+// ----------------- MongoDB -----------------
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-  .then(() => console.log('🍭 Connected to MongoDB'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+.then(() => console.log('✅ MongoDB connected'))
+.catch(err => console.error('❌ MongoDB error:', err));
 
-// Routes
+// ----------------- Routes -----------------
 app.use('/api/auth', authRoutes);
 app.use('/api/sweets', sweetRoutes);
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Sweet Shop API is running!' });
-});
+// Health check
+app.get('/api/health', (req, res) => res.json({ status: 'OK' }));
+
+// Optional root route
+app.get('/', (req, res) => res.send('Sweet Shop Backend is running!'));
 
 module.exports = app;
